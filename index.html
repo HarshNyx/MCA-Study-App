@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f4e79">
+<title>MCA Study Tracker</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#1d2433;--muted:#667085;--brand:#1f4e79;--ok:#1e8e3e;--line:#e2e6ee}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:72px}
+header{background:var(--brand);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:18px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;overflow-x:auto;z-index:5}
+nav button{flex:1;min-width:64px;border:0;background:none;padding:10px 4px;font-size:12px;color:var(--muted)}
+nav button.on{color:var(--brand);font-weight:700}
+main{padding:12px;max-width:760px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+h2{font-size:17px;margin:4px 0 10px}
+h3{font-size:15px;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:14px}
+button.ghost{background:#eef2f8;color:var(--brand)}
+button.danger{background:#fdecec;color:#b42318}
+input,select,textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;max-width:100%}
+textarea{min-height:60px}
+.muted{color:var(--muted);font-size:13px}
+.bar{height:10px;background:#e9edf5;border-radius:6px;overflow:hidden}
+.bar>span{display:block;height:100%;background:var(--ok)}
+label.chk{display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:14px}
+label.chk input{width:auto;margin-top:3px}
+.done{text-decoration:line-through;color:var(--muted)}
+.stat{text-align:center}.stat b{font-size:22px;display:block}
+details{padding:4px 0}
+details summary{cursor:pointer;font-weight:600;padding:6px 0}
+svg text{font-family:system-ui,Arial;font-size:12px;fill:#1d2433}
+.toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#101828;color:#fff;padding:10px 14px;border-radius:10px;z-index:9;font-size:14px;display:none;max-width:90%}
+</style>
+</head>
+<body>
+<header><h1>MCA Study Tracker</h1></header>
+<main id="main"></main>
+<nav>
+<button data-p="home" onclick="go('home')">Home</button>
+<button data-p="sems" onclick="go('sems')">Subjects</button>
+<button data-p="tt" onclick="go('tt')">Timetable</button>
+<button data-p="rem" onclick="go('rem')">Reminders</button>
+<button data-p="log" onclick="go('log')">Log</button>
+<button data-p="flow" onclick="go('flow')">Flow</button>
+<button data-p="back" onclick="go('back')">Backup</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='mca-study-app-v1';
+const UNITS_DEFAULT=['Unit 1','Unit 2','Unit 3','Unit 4','Unit 5'];
+const ELEC={
+ sem3:{label:'MCA-306 Elective 1',opts:{a:'Data Mining and Warehousing',b:'Big Data Technologies',c:'Soft Computing'}},
+ sem4:{label:'MCA-402 Elective 2',opts:{a:'Principles of Management and Information System',b:'Machine Learning',c:'Data Science with R'}}
+};
+// Sem 1 unit topics come from your syllabus. Sem 2 to 4 use placeholder units until we add their unit lists.
+const SEMS=[
+ {no:1,theory:[
+  {code:'MCA-101',name:'Mathematical Foundations in Computer Science',units:['Matrices, sets','Relations and functions','Permutations, combinations, probability','Statistics and logic','Graphs and trees']},
+  {code:'MCA-102',name:'Object Oriented Programming with C++',units:['Classes, objects, OOP basics','Constructors, destructors, pointers','Inheritance, polymorphism','Templates, exception handling','C++ streams, file handling']},
+  {code:'MCA-103',name:'Operating System',units:['Processes, CPU scheduling','Synchronization, semaphores','Deadlocks','Memory management, virtual memory','Linux, system calls, shell scripts']},
+  {code:'MCA-104',name:'Computer Architecture',units:['Logic gates, K-maps, flip-flops','ALU, floating point, micro-operations','Control unit, addressing modes','Interrupts, DMA, cache','8085 microprocessor']},
+  {code:'MCA-105',name:'Database Systems',units:['ER model, keys','Normalization (1NF to BCNF)','Transactions, ACID','Concurrency control, recovery','SQL and PL/SQL']},
+  {code:'MCA-106',name:'Web Technologies',units:['HTML and HTML5 forms','JavaScript basics','JavaScript objects, DOM','CSS, DHTML','PHP and MySQL']}
+ ],labs:[
+  {code:'MCA-151',name:'OOP Lab',n:9},{code:'MCA-152',name:'SQL-PL/SQL Lab',n:10},{code:'MCA-153',name:'Web Technologies Lab',n:10},
+  {code:'SODECA-1',name:'SODECA',n:0}
+ ]},
+ {no:2,theory:[
+  {code:'MCA-201',name:'Java Technologies'},{code:'MCA-202',name:'Computer Networks'},{code:'MCA-203',name:'Data Structures'},
+  {code:'MCA-204',name:'Software Engineering & UML'},{code:'MCA-205',name:'Python Programming'},{code:'MCA-206',name:'Business Informatics'}
+ ],labs:[
+  {code:'MCA-251',name:'Data Structures Lab',n:10},{code:'MCA-252',name:'Java Technologies Lab',n:10},{code:'MCA-253',name:'Python Programming Lab',n:10}
+ ]},
+ {no:3,theory:[
+  {code:'MCA-301',name:'Cloud Computing'},{code:'MCA-302',name:'Analysis and Design of Algorithms'},{code:'MCA-303',name:'Artificial Intelligence'},
+  {code:'MCA-304',name:'Information Security'},{code:'MCA-305',name:'Mobile Application Development'},{code:'MCA-306',name:'Elective 1',elective:'sem3'}
+ ],labs:[
+  {code:'MCA-351',name:'ADA Lab',n:10},{code:'MCA-352',name:'Mobile Application Development Lab',n:10},{code:'MCA-353',name:'Summer Training Presentation',n:0}
+ ]},
+ {no:4,theory:[
+  {code:'MCA-401',name:'Software Project Management'},{code:'MCA-402',name:'Elective 2',elective:'sem4'}
+ ],labs:[
+  {code:'MCA-451',name:'Industrial Project',n:0},{code:'SODECA-4',name:'SODECA',n:0}
+ ]}
+];
+// Practice questions for OOP units (index = unit number minus 1).
+const QUIZ={
+ 'MCA-102':[
+  [{q:'Difference between a class and an object?',a:'A class is a blueprint; an object is an instance that occupies memory.'},{q:'Name the three access specifiers.',a:'private, protected, public.'},{q:'What does the :: operator do?',a:'Scope resolution: accesses a class member or a global name hidden by a local one.'}],
+  [{q:'When is a constructor called?',a:'Automatically when an object is created.'},{q:'How is a destructor named and when does it run?',a:'~ClassName; it runs when the object goes out of scope.'},{q:'Default vs parameterized constructor?',a:'Default takes no arguments; parameterized takes arguments to initialize the object.'}],
+  [{q:'Define inheritance and name two types.',a:'A derived class acquires properties of a base class. Types: single, multiple, multilevel, hierarchical, hybrid.'},{q:'Compile-time vs run-time polymorphism?',a:'Compile-time: function/operator overloading. Run-time: virtual function overriding.'},{q:'Effect of private inheritance?',a:'Public and protected members of the base become private in the derived class.'}],
+  [{q:'Why use templates?',a:'To write generic code that works for any data type.'},{q:'Which keywords handle exceptions?',a:'try, catch, throw.'},{q:'Function template vs class template?',a:'A function template is a generic function; a class template is a generic class.'}],
+  [{q:'What is a stream in C++?',a:'An abstraction for a flow of input or output data.'},{q:'Name the file stream classes.',a:'ifstream (input), ofstream (output), fstream (both).'},{q:'What does put() do vs get()?',a:'put() writes one character to an output stream; get() reads one character from an input stream.'}]
+ ]
+};
+const DAYS=[
+ {d:'2026-11-08',th:'OOP Unit 1: classes, objects, OOP basics',lab:'C++ basics: data types, I/O, operators',sub:'Maths Unit 1: matrices, sets'},
+ {d:'2026-11-09',th:'OOP Unit 2: constructors, destructors, pointers',lab:'Classes and constructors programs',sub:'OS Unit 1: processes, scheduling'},
+ {d:'2026-11-10',th:'OOP Unit 3: inheritance, polymorphism',lab:'Inheritance programs',sub:'Computer Architecture Unit 1: gates, flip-flops'},
+ {d:'2026-11-11',th:'OOP Unit 4: templates, exceptions',lab:'Operator overloading, virtual functions',sub:'Web Technologies Unit 1: HTML basics'},
+ {d:'2026-11-12',th:'OOP Unit 5: C++ streams, file handling',lab:'File handling programs',sub:'DBMS Unit 1: ER model, normalization'},
+ {d:'2026-11-13',th:'OOP revision: mock Part A, B, C questions',lab:'SQL lab: SELECT, joins, group by',sub:'DBMS Unit 2: transactions, ACID'},
+ {d:'2026-11-14',th:'Catch-up on any missed unit',lab:'Web lab on phone (HTML, CSS)',sub:'Weekly quiz, study log, plan next week'}
+];
+const DAILY=[
+ ['05:15','06:00','Walk','Brisk walk, 30-40 minutes'],
+ ['06:00','06:30','Exercise','Push-ups, squats, plank, stretching'],
+ ['08:00','10:00','Morning theory',''],
+ ['10:15','11:30','Practice','Part A and B questions for the topic, no notes'],
+ ['11:30','12:00','Typing drill 1','Keyboard via OTG, 25 min, eyes on text'],
+ ['13:00','14:30','Lab work',''],
+ ['16:15','17:15','OOP theory',''],
+ ['17:25','17:50','Typing drill 2','Code symbols'],
+ ['18:00','19:00','C++ practical','Type code by hand, comment each line, predict output'],
+ ['19:30','20:30','2nd subject',''],
+ ['20:30','20:50','Typing drill 3','Short accuracy drill'],
+ ['20:50','21:15','Quiz + notes','Answer quiz without notes, write 4-5 revision notes'],
+ ['21:15','21:30','Study log','Record done / needs practice / next']
+];
+
+function seedTT(){
+ const out=[];
+ DAYS.forEach(day=>DAILY.forEach((b,i)=>{
+  let det=b[3];
+  if(b[2]==='Morning theory'||b[2]==='OOP theory') det=day.th;
+  if(b[2]==='Lab work') det=day.lab;
+  if(b[2]==='2nd subject') det=day.sub;
+  out.push({id:day.d+'-'+i,date:day.d,start:b[0],end:b[1],act:b[2],det,done:false});
+ }));
+ return out;
+}
+function fresh(){
+ return {p:{},lab:{},m:{},el:{sem3:'a',sem4:'a'},proj:{},log:[],quiz:{},tt:seedTT(),set:{notify:false,before:5},cur:1};
+}
+function load(){
+ try{const s=JSON.parse(localStorage.getItem(KEY));if(s){if(!s.tt)s.tt=seedTT();return s;}}catch(e){}
+ return fresh();
+}
+let state=load();
+function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+
+// ---------- helpers ----------
+function sub(code){if(!state.p[code])state.p[code]={units:[],notes:'',q:''};return state.p[code];}
+function allTheory(){return SEMS.flatMap(s=>s.theory);}
+function allLabs(){return SEMS.flatMap(s=>s.labs);}
+function subjUnits(code){const t=allTheory().find(x=>x.code===code);return (t&&t.units)||UNITS_DEFAULT;}
+function labArr(code){
+ const def=allLabs().find(l=>l.code===code);
+ if(!state.lab[code]||state.lab[code].length!==def.n)state.lab[code]=Array(def.n).fill(false);
+ return state.lab[code];
+}
+function semStats(s){
+ let tot=0,dn=0;
+ s.theory.forEach(t=>{const un=subjUnits(t.code);const p=sub(t.code);tot+=un.length;un.forEach((_,i)=>{if(p.units[i])dn++;});});
+ s.labs.filter(l=>l.n>0).forEach(l=>{const a=labArr(l.code);tot+=l.n;dn+=a.filter(Boolean).length;});
+ return {tot,dn};
+}
+function pct(a,b){return b?Math.round(a/b*100):0;}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function today(){return new Date().toLocaleDateString('en-CA');}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3500);}
+function upcoming(n){
+ const now=new Date();
+ return state.tt.filter(i=>!i.done && new Date(i.date+'T'+(i.end||i.start)+':00')>=now)
+  .sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start)).slice(0,n);
+}
+function download(name,text,type){
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();
+}
+
+// ---------- charts and flowcharts (plain SVG) ----------
+function barChart(items){
+ if(!items.length)return '<div class="muted">No data yet.</div>';
+ const W=360,H=200,bw=(W-20)/items.length;
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+ items.forEach((it,i)=>{
+  const x=10+i*bw+bw*0.2,w=bw*0.6,h=Math.max(1,it.val/100*150),y=170-h;
+  s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#1f4e79"/>`;
+  s+=`<text x="${x+w/2}" y="${y-4}" text-anchor="middle">${it.val}%</text>`;
+  s+=`<text x="${x+w/2}" y="188" text-anchor="middle">${esc(it.label)}</text>`;
+ });
+ return s+'</svg>';
+}
+function flowSVG(steps){
+ const W=360,H=steps.length*62+10;
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+ steps.forEach((t,i)=>{
+  const y=10+i*62;
+  s+=`<rect x="20" y="${y}" width="320" height="40" rx="8" fill="#e8f0fb" stroke="#1f4e79"/>`;
+  s+=`<text x="180" y="${y+25}" text-anchor="middle">${esc(t)}</text>`;
+  if(i<steps.length-1){
+   s+=`<line x1="180" y1="${y+40}" x2="180" y2="${y+52}" stroke="#1f4e79" stroke-width="2"/>`;
+   s+=`<polygon points="173,${y+50} 187,${y+50} 180,${y+60}" fill="#1f4e79"/>`;
+  }
+ });
+ return s+'</svg>';
+}
+
+// ---------- pages ----------
+function pageHome(){
+ let tot=0,dn=0;
+ const semPct=SEMS.map(s=>{const st=semStats(s);tot+=st.tot;dn+=st.dn;return {label:'Sem '+s.no,val:pct(st.dn,st.tot)};});
+ const ttDone=state.tt.filter(i=>i.done).length;
+ const days=[...new Set(state.tt.map(i=>i.date))].sort();
+ const dayPct=days.map(d=>{const its=state.tt.filter(i=>i.date===d);return {label:d.slice(5),val:pct(its.filter(i=>i.done).length,its.length)};});
+ const up=upcoming(3);
+ return `<div class="card"><h2>Overall progress</h2>
+  <div class="grid"><div class="stat"><b>${pct(dn,tot)}%</b>Syllabus done</div><div class="stat"><b>${pct(ttDone,state.tt.length)}%</b>Timetable done</div></div></div>
+ <div class="card"><h2>Progress by semester</h2>${barChart(semPct)}</div>
+ <div class="card"><h2>Timetable completion by day</h2>${barChart(dayPct)}</div>
+ <div class="card"><h2>Next up</h2>${up.map(i=>`<div class="muted">${i.date} ${i.start} · ${esc(i.act)}</div>`).join('')||'<div class="muted">Nothing upcoming.</div>'}</div>`;
+}
+
+function subjectHTML(t){
+ const p=sub(t.code);
+ const ch=t.elective?state.el[t.elective]:null;
+ const name=t.elective?ELEC[t.elective].opts[ch]:t.name;
+ const sel=t.elective?`<select onchange="setEl('${t.elective}',this.value)">${Object.entries(ELEC[t.elective].opts).map(([k,v])=>`<option value="${k}" ${k===ch?'selected':''}>${esc(v)}</option>`).join('')}</select>`:'';
+ const units=(t.units||UNITS_DEFAULT).map((u,i)=>`<div class="row" style="justify-content:space-between">
+   <label class="chk"><input type="checkbox" ${p.units[i]?'checked':''} onchange="tu('${t.code}',${i},this.checked)"> ${esc(u)}</label>
+   ${QUIZ[t.code]?`<button class="btn ghost" onclick="openQuiz('${t.code}',${i})">Quiz</button>`:''}</div>`).join('');
+ return `<details><summary>${t.code} ${esc(name)}</summary>${sel}${units}
+  <h3>Notes</h3><textarea onchange="tn('${t.code}','notes',this.value)">${esc(p.notes)}</textarea>
+  <h3>Important questions</h3><textarea onchange="tn('${t.code}','q',this.value)">${esc(p.q)}</textarea></details>`;
+}
+function labHTML(l){
+ if(!l.n){
+  const pr=state.proj[l.code]||{status:'Not started',dl:''};
+  return `<div class="card"><b>${l.code} ${esc(l.name)}</b>
+   <div class="row" style="margin-top:6px"><select onchange="tproj('${l.code}','status',this.value)">
+   ${['Not started','In progress','Done'].map(o=>`<option ${o===pr.status?'selected':''}>${o}</option>`).join('')}</select>
+   <input type="date" value="${pr.dl}" onchange="tproj('${l.code}','dl',this.value)"></div></div>`;
+ }
+ const arr=labArr(l.code),d=arr.filter(Boolean).length;
+ return `<details><summary>${l.code} ${esc(l.name)} (${d}/${l.n})</summary>
+  ${arr.map((v,i)=>`<label class="chk"><input type="checkbox" ${v?'checked':''} onchange="tl('${l.code}',${i},this.checked)"> Program ${i+1}</label>`).join('')}</details>`;
+}
+function marksHTML(s){
+ const rows=s.theory.map(t=>{const m=state.m[t.code]||{ia:'',ete:''};
+  return `<tr><td>${t.code}</td><td><input type="number" min="0" max="30" value="${m.ia}" onchange="setMark('${t.code}','ia',this.value)"></td>
+  <td><input type="number" min="0" max="70" value="${m.ete}" onchange="setMark('${t.code}','ete',this.value)"></td></tr>`;}).join('');
+ return `<div class="card"><h2>Marks (internal 30, end-term 70)</h2>
+  <table style="width:100%;font-size:14px"><tr><th align="left">Subject</th><th>IA</th><th>ETE</th></tr>${rows}</table></div>`;
+}
+function quizHTML(){
+ const q=QUIZ[qOpen.code][qOpen.i];
+ return `<div class="card"><h2>Quiz: ${esc(subjUnits(qOpen.code)[qOpen.i])}</h2>
+  ${q.map((x,k)=>`<details><summary>Q${k+1}. ${esc(x.q)}</summary><div class="muted" style="padding:6px 0">Answer: ${esc(x.a)}</div></details>`).join('')}
+  <div class="row" style="margin-top:8px">Right answers: <input id="qr" type="number" min="0" max="${q.length}" style="width:90px"> of ${q.length}
+  <button class="btn" onclick="saveQuiz()">Save score</button><button class="btn ghost" onclick="closeQuiz()">Close</button></div></div>`;
+}
+let qOpen=null;
+
+function pageSems(){
+ const s=SEMS.find(x=>x.no===state.cur);
+ const tabs=SEMS.map(x=>`<button class="btn ${x.no===state.cur?'':'ghost'}" onclick="setSem(${x.no})">Sem ${x.no}</button>`).join(' ');
+ const st=semStats(s);
+ let h=`<div class="row">${tabs}</div>`;
+ if(qOpen)h+=quizHTML();
+ h+=`<div class="card"><h2>Semester ${s.no}: ${st.dn}/${st.tot} units and programs done</h2><div class="bar"><span style="width:${pct(st.dn,st.tot)}%"></span></div></div>`;
+ h+=`<div class="card"><h2>Subjects</h2>${s.theory.map(subjectHTML).join('')}</div>`;
+ h+=`<div class="card"><h2>Labs and projects</h2>${s.labs.map(labHTML).join('')}</div>`;
+ h+=marksHTML(s);
+ return h;
+}
+
+function pageTT(){
+ const done=state.tt.filter(i=>i.done).length;
+ const days=[...new Set(state.tt.map(i=>i.date))].sort();
+ let h=`<div class="card"><h2>Timetable tracker</h2><div class="bar"><span style="width:${pct(done,state.tt.length)}%"></span></div>
+  <div class="muted">${done} of ${state.tt.length} blocks done (${pct(done,state.tt.length)}%)</div>
+  <div class="row" style="margin-top:8px"><button class="btn ghost" onclick="exportICS()">Download calendar file (.ics)</button></div></div>`;
+ h+=`<div class="card"><h3>Add a block</h3><div class="grid">
+  <input type="date" id="nd"><input type="time" id="ns"><input type="time" id="ne"><input id="na" placeholder="Activity"></div>
+  <input id="nx" placeholder="Details" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="btn" onclick="addBlock()">Add</button></div></div>`;
+ h+=`<div class="card"><h3>Paste timetable rows</h3><div class="muted">One block per line: date | start | end | activity | details. Date as YYYY-MM-DD, 24-hour time.</div>
+  <textarea id="paste" placeholder="2026-11-15 | 06:00 | 06:30 | Exercise | Push-ups"></textarea>
+  <div class="row" style="margin-top:6px"><button class="btn ghost" onclick="pasteRows()">Import rows</button></div></div>`;
+ days.forEach(d=>{
+  const its=state.tt.filter(i=>i.date===d).sort((a,b)=>a.start.localeCompare(b.start));
+  h+=`<div class="card"><h3>${d}</h3>`+its.map(i=>`<div class="row" style="justify-content:space-between;padding:4px 0">
+   <label class="chk ${i.done?'done':''}" style="flex:1"><input type="checkbox" ${i.done?'checked':''} onchange="tdone('${i.id}',this.checked)">
+   <span><b>${i.start}-${i.end}</b> ${esc(i.act)}<br><span class="muted">${esc(i.det)}</span></span></label>
+   <button class="btn danger" onclick="delBlock('${i.id}')">x</button></div>`).join('')+'</div>';
+ });
+ return h;
+}
+
+function pageRem(){
+ const on=state.set.notify&&('Notification' in window)&&Notification.permission==='granted';
+ const up=upcoming(10);
+ return `<div class="card"><h2>Reminders</h2>
+  <p class="muted">Reminders show while the app is open. For reminders that work with the app closed, download the calendar file and import it into your phone or Google Calendar. Each block gets an alarm.</p>
+  <div class="row"><button class="btn" onclick="enableNotify()">${on?'Phone notifications on':'Turn on phone notifications'}</button></div>
+  <div class="row" style="margin-top:8px"><span class="muted">Remind me before (minutes):</span>
+  <select onchange="setBefore(this.value)">${[0,5,10,15,30].map(m=>`<option value="${m}" ${m===state.set.before?'selected':''}>${m}</option>`).join('')}</select></div>
+  <div class="row" style="margin-top:8px"><button class="btn ghost" onclick="exportICS()">Download calendar file (.ics)</button></div></div>
+ <div class="card"><h3>Next items</h3>${up.map(i=>`<div class="muted">${i.date} ${i.start}-${i.end} · ${esc(i.act)}</div>`).join('')||'<div class="muted">Nothing upcoming.</div>'}</div>`;
+}
+
+function pageLog(){
+ const codes=allTheory().map(t=>({code:t.code,name:t.name||'Elective'}));
+ codes.push(...allLabs().map(l=>({code:l.code,name:l.name})));
+ return `<div class="card"><h2>Study log</h2>
+  <div class="grid"><input type="date" id="ld" value="${today()}">
+  <select id="ls">${codes.map(c=>`<option value="${c.code}">${c.code} ${esc(c.name)}</option>`).join('')}</select>
+  <select id="lst"><option>Covered</option><option>Needs more practice</option></select>
+  <input id="ln" placeholder="Note"></div>
+  <div class="row" style="margin-top:8px"><button class="btn" onclick="addLog()">Add entry</button></div></div>
+ <div class="card">${state.log.slice().reverse().map((e,k)=>`<div class="row" style="justify-content:space-between;padding:4px 0">
+  <span class="muted">${e.date} · ${esc(e.sub)} · <b>${esc(e.status)}</b> ${esc(e.note)}</span>
+  <button class="btn danger" onclick="delLog(${state.log.length-1-k})">x</button></div>`).join('')||'<div class="muted">No entries yet.</div>'}</div>`;
+}
+
+function pageFlow(){
+ return `<div class="card"><h2>How the app works</h2>
+  ${flowSVG(['Open app','Pick semester (1 to 4)','Pick subject','Tick units, write notes','Quiz, then save score','Add study log entry','Export backup (JSON)'])}
+  <p class="muted">Follow the arrows from top to bottom.</p></div>
+ <div class="card"><h2>How a study day works</h2>
+  ${flowSVG(['Timetable block starts','Reminder appears (app or phone)','Do the activity','Tick the checkbox','Progress and graphs update','Evening: quiz, notes, study log','Calendar file keeps reminders on phone'])}</div>
+ <div class="card"><h2>Quick guide</h2>
+  <p class="muted">Subjects: tick units as you finish them. Timetable: tick each block. Reminders: turn on notifications and download the calendar file. Log: record what you covered and what needs practice. Backup: save your data as a file before you change phones.</p></div>`;
+}
+
+function pageBack(){
+ return `<div class="card"><h2>Backup</h2>
+  <p class="muted">Your data is stored only on this phone. Export a backup file regularly, and import it on a new phone.</p>
+  <div class="row"><button class="btn" onclick="exportJSON()">Export backup (JSON)</button></div>
+  <div class="row" style="margin-top:8px"><input type="file" accept="application/json" onchange="importJSON(this)"></div>
+  <div class="row" style="margin-top:12px"><button class="btn danger" onclick="resetAll()">Reset all data</button></div></div>`;
+}
+
+const PAGES={home:pageHome,sems:pageSems,tt:pageTT,rem:pageRem,log:pageLog,flow:pageFlow,back:pageBack};
+let page='home';
+function render(){
+ document.getElementById('main').innerHTML=PAGES[page]();
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===page));
+}
+function go(p){page=p;qOpen=null;render();window.scrollTo(0,0);}
+
+// ---------- actions ----------
+function setSem(n){state.cur=n;save();render();}
+function setEl(k,v){state.el[k]=v;save();render();}
+function tu(code,i,v){sub(code).units[i]=v;save();}
+function tn(code,f,v){sub(code)[f]=v;save();}
+function tl(code,i,v){labArr(code)[i]=v;save();}
+function tproj(code,f,v){state.proj[code]=state.proj[code]||{status:'Not started',dl:''};state.proj[code][f]=v;save();}
+function setMark(code,f,v){state.m[code]=state.m[code]||{ia:'',ete:''};state.m[code][f]=v;save();}
+function openQuiz(code,i){qOpen={code,i};render();window.scrollTo(0,0);}
+function closeQuiz(){qOpen=null;render();}
+function saveQuiz(){
+ const right=+document.getElementById('qr').value||0;
+ const total=QUIZ[qOpen.code][qOpen.i].length;
+ state.quiz[qOpen.code+'|'+qOpen.i]={right,total,date:today()};
+ save();toast('Score saved');qOpen=null;render();
+}
+function tdone(id,v){const it=state.tt.find(x=>x.id===id);if(it){it.done=v;save();render();}}
+function delBlock(id){state.tt=state.tt.filter(x=>x.id!==id);save();render();}
+function addBlock(){
+ const d=document.getElementById('nd').value,s=document.getElementById('ns').value,
+  e=document.getElementById('ne').value,a=document.getElementById('na').value.trim(),x=document.getElementById('nx').value.trim();
+ if(!d||!s||!a){toast('Enter date, start time and activity');return;}
+ state.tt.push({id:d+'-'+Date.now(),date:d,start:s,end:e||s,act:a,det:x,done:false});
+ save();render();
+}
+function pasteRows(){
+ let n=0;
+ document.getElementById('paste').value.split('\n').forEach(line=>{
+  const p=line.split('|').map(x=>x.trim());
+  if(p.length>=4&&/^\d{4}-\d{2}-\d{2}$/.test(p[0])){
+   state.tt.push({id:p[0]+'-'+p[1]+'-'+Math.random().toString(36).slice(2,7),date:p[0],start:p[1],end:p[2]||p[1],act:p[3],det:p[4]||'',done:false});
+   n++;
+  }
+ });
+ save();toast(n+' block(s) added');render();
+}
+function addLog(){
+ const e={date:document.getElementById('ld').value,sub:document.getElementById('ls').value,
+  status:document.getElementById('lst').value,note:document.getElementById('ln').value.trim()};
+ state.log.push(e);save();render();
+}
+function delLog(i){state.log.splice(i,1);save();render();}
+
+// ---------- reminders ----------
+function enableNotify(){
+ if(!('Notification' in window)){toast('Notifications not supported here');return;}
+ Notification.requestPermission().then(r=>{
+  state.set.notify=(r==='granted');save();render();
+  toast(state.set.notify?'Notifications on':'Permission not granted');
+ });
+}
+function setBefore(v){state.set.before=+v;save();render();}
+const fired=new Set();
+function checkReminders(){
+ const now=Date.now();
+ state.tt.forEach(i=>{
+  if(i.done)return;
+  const st=new Date(i.date+'T'+i.start+':00').getTime();
+  const fire=st-state.set.before*60000;
+  if(now>=fire&&now<st+60000&&!fired.has(i.id)){
+   fired.add(i.id);
+   toast(i.start+' '+i.act+': '+i.det);
+   if(state.set.notify&&('Notification' in window)&&Notification.permission==='granted'){
+    new Notification('MCA Study: '+i.act,{body:i.start+' '+(i.det||'')});
+   }
+  }
+ });
+}
+setInterval(checkReminders,30000);
+
+// ---------- export ----------
+function icsT(s){return String(s).replace(/[,;\\]/g,m=>'\\'+m).replace(/\n/g,' ');}
+function exportICS(){
+ const b=state.set.before;
+ const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+ const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//MCA Study Tracker//EN','CALSCALE:GREGORIAN'];
+ state.tt.forEach(i=>{
+  const ds=i.date.replace(/-/g,'');
+  L.push('BEGIN:VEVENT',`UID:${i.id}@mca-study`,`DTSTAMP:${stamp}`,
+   `DTSTART:${ds}T${i.start.replace(':','')}00`,`DTEND:${ds}T${(i.end||i.start).replace(':','')}00`,
+   `SUMMARY:${icsT(i.act)}`,`DESCRIPTION:${icsT(i.det)}`,
+   'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsT(i.act)} in ${b} min`,`TRIGGER:-PT${b}M`,'END:VALARM','END:VEVENT');
+ });
+ L.push('END:VCALENDAR');
+ download('mca-timetable.ics',L.join('\r\n'),'text/calendar');
+}
+function exportJSON(){download('mca-backup.json',JSON.stringify(state,null,2),'application/json');}
+function importJSON(input){
+ const f=input.files[0];if(!f)return;
+ f.text().then(t=>{
+  try{const s=JSON.parse(t);if(!s.tt)throw new Error('bad');state=s;save();render();toast('Backup restored');}
+  catch(e){toast('That file is not a valid backup');}
+ });
+}
+function resetAll(){
+ if(!confirm('Delete all saved data on this phone?'))return;
+ state=fresh();save();render();toast('Data reset');
+}
+
+render();
+</script>
+</body>
+</html>
